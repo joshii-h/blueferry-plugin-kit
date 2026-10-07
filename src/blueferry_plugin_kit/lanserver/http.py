@@ -5,7 +5,9 @@ total and per client address, can drop connections from addresses outside
 an allowlist (``allowed``), and runs the TLS handshake on the connection's
 own thread with a timeout, so a slow client never blocks ``accept()``.
 CPython bounds the whole handshake by the socket timeout, not each read, so
-a trickled ClientHello ends there too.
+a trickled ClientHello ends there too. A failed handshake goes to
+:meth:`HardenedHTTPServer.handshake_failed`: by default one debug line with
+a content-free reason (:func:`handshake_reason`), never the peer or any bytes.
 
 :class:`DeadlineRequestHandler` gives every request a total deadline for
 the request line, headers and small bodies; large bodies get a grace time
@@ -115,13 +117,43 @@ class HardenedHTTPServer(ThreadingHTTPServer):
         if context is not None:
             try:
                 request = context.wrap_socket(request, server_side=True)
-            except (OSError, ssl.SSLError):
-                return  # untrusted CA, a probe, a timeout
+            except (OSError, ssl.SSLError) as error:
+                # An untrusted CA, a probe, plain HTTP, a timeout.
+                self.handshake_failed(handshake_reason(error), client_address)
+                return
         super().finish_request(request, client_address)
+
+    def handshake_failed(self, reason: str, client_address: Any) -> None:
+        """Called on the worker thread when a TLS handshake fails.
+
+        ``reason`` is content-free (see :func:`handshake_reason`). The
+        default logs it at debug level, without the address; override to
+        react as well, e.g. to show that the phone does not trust the CA
+        yet. ``client_address`` is for decisions, not for logs. The socket
+        is closed after this returns.
+        """
+        self.log.debug("TLS handshake failed: %s", reason)
 
     def handle_error(self, request: Any, client_address: Any) -> None:
         # Peers hang up mid-request; never print tracebacks with addresses.
         self.log.debug("connection ended with an error", exc_info=True)
+
+
+def handshake_reason(error: BaseException) -> str:
+    """A content-free reason for a failed handshake.
+
+    The TLS alert name in lower case (``"http_request"``,
+    ``"tlsv1_alert_unknown_ca"``), ``"timeout"`` or the error class name.
+    Never the message: it may carry addresses or bytes the peer sent.
+    """
+    if isinstance(error, ssl.SSLError):
+        reason = error.reason if isinstance(error.reason, str) else ""
+        if reason and reason.replace("_", "").isalnum():
+            return reason.lower()
+        return type(error).__name__
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    return type(error).__name__
 
 
 class DeadlineRequestHandler(BaseHTTPRequestHandler):

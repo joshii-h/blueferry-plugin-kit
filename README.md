@@ -139,6 +139,22 @@ The TLS handshake runs on the worker thread with a total timeout; every read
 gets only the time left of the request; bodies need a minimum rate; request
 lines, headers and bodies are never logged. `ServerGroup` runs one server per
 address of `netaddr.lan_interfaces()` with a shared per-address cap.
+
+A failed TLS handshake (a phone that does not trust the CA yet, a probe,
+plain HTTP on the TLS port, a timeout) calls
+`HardenedHTTPServer.handshake_failed(reason, client_address)`. By default it
+logs one debug line with the reason only (the TLS alert name, `timeout` or
+the error class, from `handshake_reason(error)`), never the address or any
+bytes; override it to react, and keep the address out of logs:
+
+```python
+class Server(HardenedHTTPServer):
+    def handshake_failed(self, reason, client_address):
+        super().handshake_failed(reason, client_address)   # the debug line
+        if reason == "tlsv1_alert_unknown_ca":
+            self.untrusted.set()                           # e.g. a hint on the card
+```
+
 `CertificateStore` keeps a ten-year local CA (what iOS can trust once) and a
 397-day server certificate that follows the listen address. Routes stay in
 the plugin.

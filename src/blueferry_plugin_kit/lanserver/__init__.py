@@ -19,6 +19,7 @@ from blueferry_plugin_kit.lanserver.http import (
     HardenedHTTPServer,
     RequestError,
     ServerGroup,
+    handshake_reason,
     serve_in_thread,
 )
 from blueferry_plugin_kit.lanserver.limits import (
@@ -43,5 +44,6 @@ __all__ = [
     "SlidingWindows",
     "deadline_rfile",
     "fingerprint",
+    "handshake_reason",
     "serve_in_thread",
 ]
