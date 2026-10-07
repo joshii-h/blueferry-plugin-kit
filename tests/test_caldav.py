@@ -267,3 +267,13 @@ def test_real_http_transport_against_a_local_server(monkeypatch) -> None:
     assert principal == f"http://127.0.0.1:{server.server_port}/dav/alice/"
     assert seen == [("PROPFIND", "/.well-known/caldav"), ("PROPFIND", "/.well-known/caldav"),
                     ("PROPFIND", "/dav/")]
+
+
+def test_the_user_agent_is_the_callers() -> None:
+    server = FakeServer("radicale")
+    client = CalDavClient("http://localhost:5232", USER, PASSWORD, send=server,
+                          user_agent="blueferry-calendar/9")
+    client.calendars()
+    assert {headers["User-Agent"] for _m, _u, headers, _b in server.requests} == {
+        "blueferry-calendar/9",
+    }
