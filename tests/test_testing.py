@@ -67,6 +67,10 @@ def test_fake_host_calls_and_records_signals(tmp_path) -> None:
     _item(subtitle="line\nbreak"), _item(actions=[_item()["actions"][0]] * 4),
     _item(extra=1), _item(title=""),
     _item(actions=[{"id": "x", "label": "", "icon": None, "kind": "button"}]),
+    _item(actions=[{"id": "x", "label": "Send", "icon": None, "kind": "button",
+                    "send_to": "a:b"}]),
+    _item(actions=[{"id": "x", "label": "Send", "icon": None, "kind": "button",
+                    "target": "a"}]),
 ])
 def test_card_violations(item) -> None:
     with pytest.raises(SpecViolation):
@@ -93,3 +97,43 @@ def test_fake_clipboard_and_test_ca(tmp_path) -> None:
     ca = TestCA(tmp_path / "ca")
     assert ca.client_context().verify_mode.name == "CERT_REQUIRED"
     assert ca.material.fingerprint.count(":") == 31
+
+
+class _Manifest:
+    def __init__(self, capabilities) -> None:
+        self.capabilities = capabilities
+
+    def has(self, capability) -> bool:
+        return capability in self.capabilities
+
+
+class SendingService(Service):
+    """A device item whose primary action sends files (plugin API 1.4)."""
+
+    def __init__(self, capabilities=("card", "share")) -> None:
+        super().__init__([_item(id="dev-1", actions=[
+            {"id": "send", "label": "Send files…", "icon": "document-send",
+             "kind": "primary", "send_to": "ls-1"},
+            {"id": "trust", "label": "Always accept", "icon": None, "kind": "button"},
+        ])])
+        self.manifest = _Manifest(capabilities)
+        self.sent = []
+
+    def SendFiles(self, target, paths, sender=None):
+        self.sent.append((target, list(paths)))
+        return json.dumps({"ok": True, "message": "Sending", "job": "j1"})
+
+
+def test_send_action_calls_send_files_on_the_target(tmp_path) -> None:
+    service = SendingService()
+    host = FakeHost(service)
+    assert host.item("dev-1")["actions"][0]["send_to"] == "ls-1"
+    assert host.send_action("dev-1", "send", ["/tmp/a"])["ok"] is True
+    assert service.sent == [("ls-1", ["/tmp/a"])]
+    assert not any(call[0] == "InvokeAction" for call in service.calls)
+    with pytest.raises(SpecViolation, match="does not send"):
+        host.send_action("dev-1", "trust", ["/tmp/a"])
+    with pytest.raises(SpecViolation, match="no card item"):
+        host.send_action("gone", "send", ["/tmp/a"])
+    with pytest.raises(SpecViolation, match="share capability"):
+        FakeHost(SendingService(("card",))).send_action("dev-1", "send", ["/tmp/a"])

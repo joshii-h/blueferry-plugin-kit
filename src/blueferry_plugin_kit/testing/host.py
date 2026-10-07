@@ -83,9 +83,14 @@ def check_card(reply: str) -> list[dict]:
         if not isinstance(actions, list) or len(actions) > surfaces.MAX_ACTIONS:
             raise SpecViolation(f"at most {surfaces.MAX_ACTIONS} actions")
         for action in actions:
-            if not isinstance(action, dict) or set(action) != {"id", "label", "icon", "kind"}:
+            # send_to (plugin API 1.4) is present only on actions that send files.
+            if not isinstance(action, dict) or set(action) - {"send_to"} != {
+                "id", "label", "icon", "kind",
+            }:
                 raise SpecViolation(f"action keys: {sorted(action)}")
             _id(action["id"], "action")
+            if "send_to" in action:
+                _id(action["send_to"], "send_to target")
             if action["kind"] not in surfaces.ACTION_KINDS:
                 raise SpecViolation(f"action kind {action['kind']!r}")
             _text(action["label"], surfaces.MAX_LABEL)
@@ -308,6 +313,21 @@ class FakeHost:
 
     def send_files(self, target_id: str, paths: list[str]) -> dict:
         return check_send(self.call("SendFiles", target_id, paths))
+
+    def send_action(self, item_id: str, action_id: str, paths: list[str]) -> dict:
+        """The user picked files for a card action with ``send_to`` (plugin
+        API 1.4), or dropped them on its item: like the core, call
+        ``SendFiles`` on that target, never ``InvokeAction``."""
+        manifest = getattr(self.service, "manifest", None)
+        if manifest is None or not manifest.has("share"):
+            raise SpecViolation("a sending action needs the share capability")
+        item = self.item(item_id)
+        if item is None:
+            raise SpecViolation(f"no card item {item_id!r}")
+        action = next((a for a in item["actions"] if a["id"] == action_id), None)
+        if action is None or "send_to" not in action:
+            raise SpecViolation(f"{item_id}:{action_id} does not send files")
+        return self.send_files(action["send_to"], paths)
 
     def info(self) -> dict:
         return _json(self.call("GetInfo"))
