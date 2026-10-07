@@ -3,11 +3,13 @@
 Shared SDK for [BlueFerry](https://github.com/joshii-h/blueferry) plugins:
 owner-only files and the desktop keyring, a safe clipboard, a hardened HTTPS
 server for the local network, LAN/VPN address choice, safe XML, WebDAV and
-CalDAV clients, a token-store skeleton for logins, and test fakes.
+CalDAV clients, token storage and the Nextcloud browser sign-in, helpers for
+"Test connection", and test fakes.
 
-Everything here was extracted from the plugins that use it
-(shortcuts, localsend, webdav, calendar, immich), where it has been
-reviewed and tested; the kit adds no new behaviour.
+Most of it was extracted from the plugins that use it (shortcuts,
+localsend, webdav, calendar, immich), where it has been reviewed and
+tested. 0.2 adds the plugin-api 1.3 pieces (`auth.nextcloud`,
+`configtest`, the settings checks in `FakeHost`).
 
 It targets the plugin contract **plugin-api 1.3**
 (`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api`)
@@ -20,12 +22,12 @@ dependencies; pick the extras a plugin needs:
 
 | Extra       | Pulls in                                                    | For                                     |
 |-------------|-------------------------------------------------------------|-----------------------------------------|
-| *(none)*    | –                                                           | `secrets`, `clipboard`, `netaddr`, `auth`, `testing` (host and fakes), `lanserver` limits and server |
+| *(none)*    | –                                                           | `secrets`, `clipboard`, `netaddr`, `auth`, `configtest`, `testing` (host and fakes), `lanserver` limits and server |
 | `lanserver` | cryptography                                                | `lanserver.tls` (local CA, certificates), `testing.TestCA` |
 | `xml`       | defusedxml                                                  | `xmlsafe`                               |
 | `dav`       | defusedxml                                                  | `dav.webdav`, `dav.caldav`              |
 | `caldav`    | defusedxml, icalendar, recurring-ical-events, x-wr-timezone | `dav.ical` (recurrences, time zones)    |
-| `auth`      | – (provider libraries later)                                | `auth`                                  |
+| `auth`      | –                                                           | `auth`, `auth.nextcloud`                |
 | `testing`   | wsgidav, cheroot                                            | `testing.DavServer`, `testing.WsgiServer` |
 
 In a plugin's `pyproject.toml`:
@@ -33,12 +35,12 @@ In a plugin's `pyproject.toml`:
 ```toml
 dependencies = [
   "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api",
-  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.1.0",
+  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.2.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.1.0",
+  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.2.0",
   "pytest>=7,<10",
 ]
 ```
@@ -179,7 +181,7 @@ Credentials only go to the configured host and hosts the user confirmed; a
 redirect or href elsewhere raises `CalDavError("foreign-host", host)`. Basic
 and Digest (MD5, SHA-256) login; `http_proxy` is ignored unless `use_proxy`.
 
-### `auth`: token storage and refresh (skeleton)
+### `auth`: token storage, refresh and the Nextcloud sign-in
 
 ```python
 from blueferry_plugin_kit.auth import Token, TokenSource, TokenStore
@@ -190,13 +192,60 @@ source = TokenSource(store, where, refresher)      # refresher.refresh(token) ->
 headers = {"Authorization": source.token().authorization()}
 ```
 
-Login flows and providers come in a later release.
+#### `auth.nextcloud`: Nextcloud Login Flow v2 (`ConfigLogin=nextcloud`)
+
+The browser sign-in of plugin-api 1.3: BlueFerry opens Nextcloud's
+"Connect to your account" page, the plugin polls Nextcloud and receives
+server, login name and a fresh app password. https only (typed server,
+login page, poll endpoint), no redirects, no proxy, flows expire after
+20 minutes, at most four at a time. The app password goes from Nextcloud
+into the `store` callback and never into a reply or a log.
+
+```python
+from blueferry_plugin_kit.auth.nextcloud import NextcloudLogin
+
+self._login = NextcloudLogin(user_agent="BlueFerry WebDAV")
+
+def config_login(self, provider, values):            # ConfigLogin
+    return self._login.login_step(str(values.get("url") or ""))
+
+def config_login_status(self, login_id):            # every 2 s
+    return self._login.status_step(login_id, self._store_login)
+
+def config_login_cancel(self, login_id):
+    self._login.cancel(login_id)
+
+def _store_login(self, credentials):                # -> the "done" message
+    # credentials.server, .login_name, .app_password, .webdav_url, .dav_url
+    self._settings.save(credentials.webdav_url, credentials.login_name,
+                        credentials.app_password)
+    return f"Connected as {credentials.login_name}"
+```
+
+`server_root(url)` cuts a typed WebDAV/CalDAV address back to the
+Nextcloud root. Messages default to English; pass `messages={reason: text}`
+to translate.
+
+### `configtest`: "Test connection" (`ConfigTest=true`)
+
+```python
+from blueferry_plugin_kit.configtest import connected, failed, passed, scrub, secret_or_stored
+
+def test_config(self, values):                      # nothing is stored
+    key = secret_or_stored(values, "api_key", self._stored_key)  # typed or stored
+    user, version = self._check(values["url"], key)              # raises ConfigError
+    return passed(connected(user, "Immich", version))  # "Connected as anna to Immich 1.135"
+```
+
+`scrub(text, secret)` makes server text safe to show; `failed(message,
+field=reason)` marks fields.
 
 ### `testing`: fakes for plugin tests
 
 ```python
 from blueferry_plugin_kit.testing import (
-    DavServer, FakeClipboard, FakeHost, FakeSecret, TestCA, isolate_environment,
+    DavServer, FakeClipboard, FakeHost, FakeNextcloudLogin, FakeSecret, TestCA,
+    WsgiServer, check_versions, isolate_environment,
 )
 
 # conftest.py, before the plugin is imported:
@@ -206,18 +255,30 @@ host = FakeHost(service, cache_roots=[cache_dir])  # plays the core for card/sha
 items = host.card_items()                          # SpecViolation on any 1.2 breach
 result = host.invoke("item-id", "action-id", {"x": 1})
 host.wait_for(lambda: host.notifications)
+
+# 1.3 settings helpers, checked against the spec as well
+host.test_config({"url": "https://photos.example.com", "api_key": "…"})  # {ok, message}
+login = FakeNextcloudLogin(login_name="anna")
+with WsgiServer(login, ca=TestCA(tmp_path)) as server:   # https
+    step = host.sign_in({"url": server.base}, before_poll=lambda n: login.grant())
+host.assert_never_sent(app_password)                # no reply or popup leaked it
+
+# tests/test_versions.py: manifest Version=, pyproject and __version__ agree
+check_versions(Path(__file__).parent.parent, __version__)
 ```
 
 `FakeSecret` replaces `gi.repository.Secret` (`KeyringStore(secret=…)`),
 `TestCA` gives a server and a trusting client context, `DavServer` runs
-wsgidav on 127.0.0.1 (extra `testing`).
+wsgidav on 127.0.0.1 and `WsgiServer` any WSGI app, with `ca=` over https
+(extra `testing`). Code that uses the default TLS context trusts the test
+CA when the test sets `SSL_CERT_FILE` to `ca.store.ca_cert_path`.
 
 ## Stability
 
 The public API is every name without a leading underscore in the modules
 above. From 0.1 on, a **minor** release (0.1 → 0.2) may change it; a
 **patch** release (0.1.0 → 0.1.1) never does, it only fixes bugs. Plugins
-pin a tag (`@kit-v0.1.0`). From 1.0 on the usual semantic-versioning rules
+pin a tag (`@kit-v0.2.0`). From 1.0 on the usual semantic-versioning rules
 apply. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Development

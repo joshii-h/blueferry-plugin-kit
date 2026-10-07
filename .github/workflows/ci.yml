@@ -54,6 +54,6 @@ jobs:
           python -m venv .venv
           .venv/bin/pip install --upgrade pip
           .venv/bin/pip install .
-          .venv/bin/python -c "import blueferry_plugin_kit.secrets, blueferry_plugin_kit.clipboard, blueferry_plugin_kit.netaddr, blueferry_plugin_kit.xmlsafe, blueferry_plugin_kit.auth, blueferry_plugin_kit.lanserver, blueferry_plugin_kit.dav, blueferry_plugin_kit.testing"
+          .venv/bin/python -c "import blueferry_plugin_kit.secrets, blueferry_plugin_kit.clipboard, blueferry_plugin_kit.netaddr, blueferry_plugin_kit.xmlsafe, blueferry_plugin_kit.auth, blueferry_plugin_kit.auth.nextcloud, blueferry_plugin_kit.configtest, blueferry_plugin_kit.lanserver, blueferry_plugin_kit.dav, blueferry_plugin_kit.testing"
           ! .venv/bin/python -c "import cryptography" 2>/dev/null
           ! .venv/bin/python -c "import defusedxml" 2>/dev/null

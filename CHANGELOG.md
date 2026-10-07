@@ -3,6 +3,25 @@
 All notable changes to blueferry-plugin-kit. Minor releases (0.x) may
 change the public API; patch releases only fix bugs (see README, Stability).
 
+## 0.2.0 – 2026-10-07
+
+Targets plugin-api 1.3 (guided settings, TestConfig, ConfigLogin).
+
+- Pins `blueferry-plugin-api` at `plugin-api-v1.3.0`.
+- `auth.nextcloud`: Nextcloud Login Flow v2 for `ConfigLogin=nextcloud`
+  (https only, no redirects, 20-minute expiry, throttled polling, app
+  password never logged); `login_step`/`status_step`/`cancel` map it onto
+  the plugin hooks. `auth` is a package now; `from blueferry_plugin_kit.auth
+  import Token, …` keeps working.
+- `configtest`: `secret_or_stored`, `connected`, `scrub`, `passed`,
+  `failed` for `TestConfig`.
+- `testing.FakeHost`: `test_config`, `config_login`, `login_status`,
+  `sign_in`, `cancel_sign_in` with spec checks, `opened`, `replies` and
+  `assert_never_sent(secret)`.
+- `testing.FakeNextcloudLogin` (Login Flow v2 as WSGI app),
+  `WsgiServer(app, ca=TestCA)` for https, `check_versions` (manifest,
+  pyproject and `__version__` agree).
+
 ## 0.1.0 – 2026-10-07
 
 First release, extracted from the BlueFerry plugins without changing

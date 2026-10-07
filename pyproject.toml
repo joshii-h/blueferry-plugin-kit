@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blueferry-plugin-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared SDK for BlueFerry plugins: secrets, clipboard, hardened LAN server, WebDAV/CalDAV, test fakes"
 readme = "README.md"
 license = {text = "GPL-2.0-or-later"}
@@ -31,7 +31,7 @@ caldav = [
   "recurring-ical-events>=3.3,<4",
   "x-wr-timezone>=1.0,<3",
 ]
-# Token storage and refresh; provider login flows come later.
+# Token storage and refresh, Nextcloud Login Flow v2 (standard library only).
 auth = []
 # A real WebDAV server for plugin tests.
 testing = ["wsgidav>=4.3,<5", "cheroot>=10,<12"]
