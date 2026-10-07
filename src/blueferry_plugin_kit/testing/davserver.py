@@ -6,7 +6,8 @@ cheroot server with a random port, in a thread::
     with DavServer(tmp_path / "root", "alice", "secret") as dav:
         client = WebDavClient(dav.url, "alice", "secret")
 
-:class:`WsgiServer` runs any WSGI app the same way (e.g. a fake Nextcloud).
+:class:`WsgiServer` runs any WSGI app the same way (e.g. a fake Nextcloud);
+with ``ca=TestCA(...)`` it speaks https with that CA's server certificate.
 """
 from __future__ import annotations
 
@@ -20,11 +21,22 @@ from blueferry_plugin_kit._extras import need
 
 
 class WsgiServer:
-    """A cheroot WSGI server on 127.0.0.1 with a random port, in a thread."""
+    """A cheroot WSGI server on 127.0.0.1 with a random port, in a thread.
 
-    def __init__(self, app: Any) -> None:
+    ``ca``: a :class:`~blueferry_plugin_kit.testing.TestCA`; the server then
+    uses https and clients trust it through ``ca.client_context()``.
+    """
+
+    def __init__(self, app: Any, *, ca: Any = None) -> None:
         wsgi = need("cheroot.wsgi", "testing")
         self._server = wsgi.Server(("127.0.0.1", 0), app, numthreads=4)
+        self.scheme = "http"
+        if ca is not None:
+            builtin = need("cheroot.ssl.builtin", "testing")
+            self._server.ssl_adapter = builtin.BuiltinSSLAdapter(
+                str(ca.material.cert_path), str(ca.material.key_path),
+            )
+            self.scheme = "https"
         self._server.prepare()
         self.server_port: int = self._server.bind_addr[1]
         self._thread = threading.Thread(target=self._server.serve, daemon=True)
@@ -33,7 +45,7 @@ class WsgiServer:
 
     @property
     def base(self) -> str:
-        return f"http://127.0.0.1:{self.server_port}"
+        return f"{self.scheme}://127.0.0.1:{self.server_port}"
 
     def stop(self) -> None:
         if not self._stopped:
