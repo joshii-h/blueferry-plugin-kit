@@ -9,8 +9,8 @@ Everything here was extracted from the plugins that use it
 (shortcuts, localsend, webdav, calendar, immich), where it has been
 reviewed and tested; the kit adds no new behaviour.
 
-It targets the plugin contract **plugin-api 1.2**
-(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.2.0#subdirectory=plugin-api`)
+It targets the plugin contract **plugin-api 1.3**
+(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api`)
 and Python 3.10+.
 
 ## Install
@@ -32,7 +32,7 @@ In a plugin's `pyproject.toml`:
 
 ```toml
 dependencies = [
-  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.2.0#subdirectory=plugin-api",
+  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api",
   "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.1.0",
 ]
 
