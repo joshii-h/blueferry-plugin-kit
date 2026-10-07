@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blueferry-plugin-kit"
-version = "0.2.0"
+version = "0.2.1"
 description = "Shared SDK for BlueFerry plugins: secrets, clipboard, hardened LAN server, WebDAV/CalDAV, test fakes"
 readme = "README.md"
 license = {text = "GPL-2.0-or-later"}

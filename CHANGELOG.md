@@ -3,6 +3,15 @@
 All notable changes to blueferry-plugin-kit. Minor releases (0.x) may
 change the public API; patch releases only fix bugs (see README, Stability).
 
+## 0.2.1 – 2026-10-07
+
+- `lanserver`: `HardenedHTTPServer.handshake_failed(reason, client_address)`
+  is called when a TLS handshake fails. The default logs one debug line
+  with the reason only (TLS alert name, `timeout` or error class), never
+  the address or request bytes; plugins override it to react. Before, a
+  failed handshake was dropped silently.
+- `lanserver.handshake_reason(error)`: the content-free reason used for it.
+
 ## 0.2.0 – 2026-10-07
 
 Targets plugin-api 1.3 (guided settings, TestConfig, ConfigLogin).
