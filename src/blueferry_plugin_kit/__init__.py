@@ -13,5 +13,5 @@ from __future__ import annotations
 
 from blueferry_plugin_kit._extras import MissingExtraError
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 __all__ = ["MissingExtraError", "__version__"]

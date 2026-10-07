@@ -9,10 +9,11 @@ CalDAV clients, token storage and the Nextcloud browser sign-in, helpers for
 Most of it was extracted from the plugins that use it (shortcuts,
 localsend, webdav, calendar, immich), where it has been reviewed and
 tested. 0.2 adds the plugin-api 1.3 pieces (`auth.nextcloud`,
-`configtest`, the settings checks in `FakeHost`).
+`configtest`, the settings checks in `FakeHost`); 0.3 follows plugin-api
+1.4 (card actions that send files, `FakeHost.send_action`).
 
-It targets the plugin contract **plugin-api 1.3**
-(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api`)
+It targets the plugin contract **plugin-api 1.4**
+(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.4.0#subdirectory=plugin-api`)
 and Python 3.10+.
 
 ## Install
@@ -34,13 +35,13 @@ In a plugin's `pyproject.toml`:
 
 ```toml
 dependencies = [
-  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api",
-  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.2.1",
+  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.4.0#subdirectory=plugin-api",
+  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.3.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.2.1",
+  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.3.0",
   "pytest>=7,<10",
 ]
 ```
@@ -270,6 +271,7 @@ isolate_environment("blueferry-myplugin-tests-")
 host = FakeHost(service, cache_roots=[cache_dir])  # plays the core for card/share/notify
 items = host.card_items()                          # SpecViolation on any 1.2 breach
 result = host.invoke("item-id", "action-id", {"x": 1})
+host.send_action("dev-1", "send", [str(photo)])     # 1.4: an action with send_to
 host.wait_for(lambda: host.notifications)
 
 # 1.3 settings helpers, checked against the spec as well
@@ -294,8 +296,17 @@ CA when the test sets `SSL_CERT_FILE` to `ca.store.ca_cert_path`.
 The public API is every name without a leading underscore in the modules
 above. From 0.1 on, a **minor** release (0.1 → 0.2) may change it; a
 **patch** release (0.1.0 → 0.1.1) never does, it only fixes bugs. Plugins
-pin a tag (`@kit-v0.2.1`). From 1.0 on the usual semantic-versioning rules
+pin a tag (`@kit-v0.3.0`). From 1.0 on the usual semantic-versioning rules
 apply. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+## Logging
+
+Since plugin-api 1.4, `blueferry.plugin_api.service.run()` gives every
+plugin a rotating owner-only log file at
+`~/.local/state/blueferry/plugins/<Id>.log` with secret-looking values
+masked; users open it with "Show Log" or `blueferry plugins log ID`. Use
+`logging.getLogger(__name__)` as usual and keep personal data out of
+messages; the kit's own modules log only lengths, states and error classes.
 
 ## Development
 

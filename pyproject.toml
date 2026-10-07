@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blueferry-plugin-kit"
-version = "0.2.1"
+version = "0.3.0"
 description = "Shared SDK for BlueFerry plugins: secrets, clipboard, hardened LAN server, WebDAV/CalDAV, test fakes"
 readme = "README.md"
 license = {text = "GPL-2.0-or-later"}
@@ -15,7 +15,7 @@ requires-python = ">=3.10"
 # dbus-python, PyGObject and libsecret come from the distribution (plugin
 # venvs are created with --system-site-packages).
 dependencies = [
-  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.3.0#subdirectory=plugin-api",
+  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.4.0#subdirectory=plugin-api",
 ]
 
 [project.optional-dependencies]

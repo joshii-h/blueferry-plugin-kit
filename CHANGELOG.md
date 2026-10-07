@@ -3,6 +3,17 @@
 All notable changes to blueferry-plugin-kit. Minor releases (0.x) may
 change the public API; patch releases only fix bugs (see README, Stability).
 
+## 0.3.0 – 2026-10-07
+
+Targets plugin-api 1.4 (card actions that send files, `ReplacesTools`,
+the standard plugin log file).
+
+- Pins `blueferry-plugin-api` at `plugin-api-v1.4.0`.
+- `testing.FakeHost`: `check_card` accepts `send_to` on an action (an id);
+  `send_action(item, action, paths)` calls `SendFiles` on that target the
+  way BlueFerry does after the file dialog or a drop, and refuses actions
+  without `send_to` or plugins without `share`.
+
 ## 0.2.1 – 2026-10-07
 
 - `lanserver`: `HardenedHTTPServer.handshake_failed(reason, client_address)`
