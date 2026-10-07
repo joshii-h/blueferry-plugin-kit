@@ -1,0 +1,10 @@
+{
+  "auth": "digest",
+  "challenge": "Digest realm=\"BaikalDAV\",qop=\"auth\",nonce=\"6f3a1c2b9d8e7f60a1b2c3d4e5f60718\",opaque=\"df58bdff8cf60599c939187d0b5c54de\"",
+  "routes": {
+    "PROPFIND https://dav.example.org/dav.php": {"status": 207, "body": "root.xml"},
+    "PROPFIND https://dav.example.org/dav.php/principals/alice/": {"status": 207, "body": "principal.xml"},
+    "PROPFIND https://dav.example.org/dav.php/calendars/alice/": {"status": 207, "body": "calendars.xml"},
+    "REPORT https://dav.example.org/dav.php/calendars/alice/default/": {"status": 207, "body": "report.xml"}
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "auth": "basic",
+  "challenge": "Basic realm=\"Apple Account\"",
+  "routes": {
+    "PROPFIND https://caldav.icloud.com/.well-known/caldav": {"status": 301, "headers": {"Location": "/"}},
+    "PROPFIND https://caldav.icloud.com/": {"status": 207, "body": "root.xml"},
+    "PROPFIND https://caldav.icloud.com/1234567890/principal/": {"status": 207, "body": "principal.xml"},
+    "PROPFIND https://p42-caldav.icloud.com:443/1234567890/calendars/": {"status": 207, "body": "calendars.xml"},
+    "REPORT https://p42-caldav.icloud.com:443/1234567890/calendars/home/": {"status": 207, "body": "report-home.xml"},
+    "REPORT https://p42-caldav.icloud.com:443/1234567890/calendars/2A7C1F0E-5B8D-4C2B-9E61-0F7C3A2B1D44/": {"status": 207, "body": "report-work.xml"}
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "auth": "basic",
+  "challenge": "Basic realm=\"Radicale - Password Required\"",
+  "routes": {
+    "PROPFIND http://localhost:5232/.well-known/caldav": {"status": 301, "headers": {"Location": "/"}},
+    "PROPFIND http://localhost:5232/": {"status": 207, "body": "root.xml"},
+    "PROPFIND http://localhost:5232/alice/": {"status": 207, "body": "principal-or-home.xml"},
+    "REPORT http://localhost:5232/alice/0c6e0b1a-5f0e-4e4b-9b1c-2a7b5d1f9e10/": {"status": 207, "body": "report.xml"}
+  }
+}

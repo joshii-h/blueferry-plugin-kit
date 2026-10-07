@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<multistatus xmlns="DAV:">
+<response><href>/1234567890/calendars/2A7C1F0E-5B8D-4C2B-9E61-0F7C3A2B1D44/call-nyc-1.ics</href><propstat><prop><getetag>"mfmxv4rs"</getetag><calendar-data xmlns="urn:ietf:params:xml:ns:caldav">{{ics:call.ics}}</calendar-data></prop><status>HTTP/1.1 200 OK</status></propstat></response>
+<response><href>/1234567890/calendars/2A7C1F0E-5B8D-4C2B-9E61-0F7C3A2B1D44/ny-review.ics</href><propstat><prop><getetag>"mfmxv4rt"</getetag><calendar-data xmlns="urn:ietf:params:xml:ns:caldav"><![CDATA[{{raw:newyork.ics}}]]></calendar-data></prop><status>HTTP/1.1 200 OK</status></propstat></response>
+</multistatus>

@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blueferry-plugin-kit"
+version = "0.1.0"
+description = "Shared SDK for BlueFerry plugins: secrets, clipboard, hardened LAN server, WebDAV/CalDAV, test fakes"
+readme = "README.md"
+license = {text = "GPL-2.0-or-later"}
+requires-python = ">=3.10"
+# The core needs nothing but the plugin contract. Heavy dependencies sit
+# behind extras and are imported only by the modules that use them; a
+# missing extra raises MissingExtraError naming the extra to install.
+# dbus-python, PyGObject and libsecret come from the distribution (plugin
+# venvs are created with --system-site-packages).
+dependencies = [
+  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.2.0#subdirectory=plugin-api",
+]
+
+[project.optional-dependencies]
+# Local CA and server certificates.
+lanserver = ["cryptography>=42,<51"]
+# Server answers: no DTDs, no entities.
+xml = ["defusedxml>=0.7,<1"]
+dav = ["defusedxml>=0.7,<1"]
+# CalDAV plus local expansion of recurring events and time zones.
+caldav = [
+  "defusedxml>=0.7,<1",
+  "icalendar>=6.0,<8",
+  "recurring-ical-events>=3.3,<4",
+  "x-wr-timezone>=1.0,<3",
+]
+# Token storage and refresh; provider login flows come later.
+auth = []
+# A real WebDAV server for plugin tests.
+testing = ["wsgidav>=4.3,<5", "cheroot>=10,<12"]
+all = ["blueferry-plugin-kit[lanserver,caldav,dav,xml,auth,testing]"]
+dev = [
+  "blueferry-plugin-kit[all]",
+  "pytest>=7,<10",
+  "ruff>=0.5,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/joshii-h/blueferry-plugin-kit"
+Source = "https://github.com/joshii-h/blueferry-plugin-kit"
+Changelog = "https://github.com/joshii-h/blueferry-plugin-kit/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"blueferry_plugin_kit" = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+ignore = ["B904", "RUF005", "RUF001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["blueferry_plugin_kit"]
+known-third-party = ["blueferry"]

@@ -1,0 +1,12 @@
+{
+  "auth": "basic",
+  "challenge": "Basic realm=\"Nextcloud\", charset=\"UTF-8\"",
+  "routes": {
+    "PROPFIND https://cloud.example.org/.well-known/caldav": {"status": 301, "headers": {"Location": "https://cloud.example.org/remote.php/dav/"}},
+    "PROPFIND https://cloud.example.org/remote.php/dav/": {"status": 207, "body": "root.xml"},
+    "PROPFIND https://cloud.example.org/remote.php/dav/principals/users/alice/": {"status": 207, "body": "principal.xml"},
+    "PROPFIND https://cloud.example.org/remote.php/dav/calendars/alice/": {"status": 207, "body": "calendars.xml"},
+    "REPORT https://cloud.example.org/remote.php/dav/calendars/alice/personal/": {"status": 207, "body": "report-personal.xml"},
+    "REPORT https://cloud.example.org/remote.php/dav/calendars/alice/contact_birthdays/": {"status": 207, "body": "report-birthdays.xml"}
+  }
+}
