@@ -1,7 +1,8 @@
-"""A strict stand-in for the BlueFerry core of PLUGIN-SURFACES v1.2.
+"""A strict stand-in for the BlueFerry core of the plugin API.
 
 :class:`FakeHost` calls a plugin service in-process (no bus) the way the
-core does (``card``, ``share``, ``notify``): with a sender and, for
+core does (the 1.2 surfaces ``card``, ``share``, ``notify`` and the 1.3
+settings helpers ``TestConfig`` and ``ConfigLogin``): with a sender and, for
 methods declared with D-Bus async callbacks, ``reply``/``error``. Every
 reply is checked field by field against the limits of
 :mod:`blueferry.plugin_api.surfaces`; a violation raises
@@ -17,13 +18,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from blueferry.plugin_api import surfaces
+from blueferry.plugin_api import config_flow, surfaces
 
 MAX_REPLY_BYTES = 512 * 1024
 
 
 class SpecViolation(AssertionError):
-    """A plugin reply or signal breaks PLUGIN-SURFACES v1.2."""
+    """A plugin reply or signal breaks the plugin API (PLUGINS.md)."""
 
 
 def _text(value: object, limit: int, *, optional: bool = False) -> None:
@@ -151,6 +152,48 @@ def check_notification(args: tuple) -> tuple[str, str, str, str, str]:
     return title, body, icon, label, action
 
 
+def _one_line(value: object, limit: int = config_flow.MAX_MESSAGE) -> None:
+    if not isinstance(value, str) or len(value) > limit:
+        raise SpecViolation(f"message over {limit} characters: {value!r}")
+    if any(not ch.isprintable() for ch in value) or value != " ".join(value.split()):
+        raise SpecViolation(f"message must be one line of plain text: {value!r}")
+
+
+def check_test_config(reply: str) -> dict:
+    """A ``TestConfig`` reply: ``{ok, message, errors?}``, one-line texts."""
+    data = _json(reply)
+    if not isinstance(data, dict) or not {"ok", "message"} <= set(data) <= {
+        "ok", "message", "errors",
+    } or not isinstance(data["ok"], bool):
+        raise SpecViolation("TestConfig reply must be {ok, message, errors?}")
+    _one_line(data["message"])
+    if not data["message"]:
+        raise SpecViolation("TestConfig answered without a message")
+    errors = data.get("errors", {})
+    if not isinstance(errors, dict):
+        raise SpecViolation("TestConfig errors must be an object")
+    for key, reason in errors.items():
+        _one_line(key, 32)
+        _one_line(reason)
+    return data
+
+
+def check_login_step(reply: str, *, start: bool) -> dict:
+    """A ``ConfigLogin`` (``start``) or ``ConfigLoginStatus`` reply."""
+    data = _json(reply)
+    if not isinstance(data, dict) or not set(data) <= {"state", "message", "login_id", "open_uri"}:
+        raise SpecViolation(f"unexpected sign-in reply: {data!r}")
+    if "message" in data:
+        _one_line(data["message"])
+    try:
+        config_flow.parse_login_step(data, start=start)
+    except config_flow.FlowError as error:
+        raise SpecViolation(str(error)) from None
+    if data["state"] != "open" and ("login_id" in data or "open_uri" in data):
+        raise SpecViolation("only an open sign-in carries login_id and open_uri")
+    return data
+
+
 class FakeHost:
     """Plays the core for one plugin service.
 
@@ -170,6 +213,10 @@ class FakeHost:
         self.card_changed = 0
         self.snapshots: list[list[dict]] = []
         self.notifications: list[tuple[str, str, str, str, str]] = []
+        #: Every raw reply, for :meth:`assert_never_sent`.
+        self.replies: list[str] = []
+        #: Sign-in pages BlueFerry would have opened in the browser.
+        self.opened: list[str] = []
         self._changed = threading.Condition()
         # Instance attributes shadow the dbus-decorated signal methods.
         service.CardChanged = self._on_card_changed
@@ -219,8 +266,19 @@ class FakeHost:
                 raise outcome["error"]
             if "reply" not in outcome:
                 raise SpecViolation(f"{method} answered neither reply nor error")
-            return outcome["reply"]
-        return function(*args, sender=self.sender)
+            reply = outcome["reply"]
+        else:
+            reply = function(*args, sender=self.sender)
+        if isinstance(reply, str):
+            self.replies.append(reply)
+        return reply
+
+    def assert_never_sent(self, *secrets: str) -> None:
+        """No reply and no notification so far contained any of ``secrets``."""
+        texts = [*self.replies, *("\n".join(note) for note in self.notifications)]
+        for secret in secrets:
+            if secret and any(secret in text for text in texts):
+                raise SpecViolation("a reply or notification contains a secret")
 
     def card_items(self) -> list[dict]:
         return check_card(self.call("GetCardItems"))
@@ -262,3 +320,53 @@ class FakeHost:
 
     def set_config(self, values: dict) -> dict:
         return _json(self.call("SetConfig", json.dumps(values)))
+
+    # ---- settings helpers (ApiVersion 1.3) ---------------------------------------
+
+    def test_config(self, values: dict) -> dict:
+        """The user pressed "Test connection" with these typed values."""
+        if not self.service.manifest.config_test:
+            raise SpecViolation("the manifest does not declare ConfigTest=true")
+        return check_test_config(self.call("TestConfig", json.dumps(values)))
+
+    def config_login(self, values: dict, provider: str | None = None) -> dict:
+        """The user pressed "Sign in with …"; ``values`` without secrets."""
+        name = provider or self.service.manifest.config_login
+        if not name:
+            raise SpecViolation("the manifest declares no ConfigLogin provider")
+        step = check_login_step(
+            self.call("ConfigLogin", name, json.dumps(values)), start=True,
+        )
+        if step["state"] == "open":
+            self.opened.append(step["open_uri"])
+        return step
+
+    def login_status(self, login_id: str) -> dict:
+        return check_login_step(self.call("ConfigLoginStatus", login_id), start=False)
+
+    def cancel_sign_in(self, login_id: str) -> dict:
+        reply = _json(self.call("ConfigLoginCancel", login_id))
+        if reply != {"ok": True}:
+            raise SpecViolation("ConfigLoginCancel must answer {ok: true}")
+        return reply
+
+    def sign_in(
+        self, values: dict, *, max_polls: int = 50,
+        before_poll: Callable[[int], None] | None = None,
+    ) -> dict:
+        """Start a sign-in and poll it like BlueFerry until a final state.
+
+        ``before_poll(n)`` runs before the n-th status call (from 0), e.g.
+        to let the fake server grant access. Without sleeping; a flow still
+        pending after ``max_polls`` comes back as ``{"state": "pending"}``.
+        """
+        step = self.config_login(values)
+        if step["state"] != "open":
+            return step
+        for poll in range(max_polls):
+            if before_poll is not None:
+                before_poll(poll)
+            status = self.login_status(step["login_id"])
+            if status["state"] != "pending":
+                return status
+        return {"state": "pending", "login_id": step["login_id"]}
