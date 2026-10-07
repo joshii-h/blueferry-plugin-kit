@@ -56,12 +56,17 @@ def test_fake_host_calls_and_records_signals(tmp_path) -> None:
         service.Notify("x" * 81, "", "", "", "")
     with pytest.raises(SpecViolation):
         service.CardChanged("content")
+    with pytest.raises(SpecViolation):
+        service.Notify("Titel", "", "", "Öffnen", "")     # label without action
+    with pytest.raises(SpecViolation):
+        check_card(json.dumps({"items": [_item(), _item()]}))   # duplicate ids
 
 
 @pytest.mark.parametrize("item", [
     _item(id="bad:id"), _item(title="x" * 81), _item(icon="/usr/share/x.png"),
     _item(subtitle="line\nbreak"), _item(actions=[_item()["actions"][0]] * 4),
-    _item(extra=1),
+    _item(extra=1), _item(title=""),
+    _item(actions=[{"id": "x", "label": "", "icon": None, "kind": "button"}]),
 ])
 def test_card_violations(item) -> None:
     with pytest.raises(SpecViolation):

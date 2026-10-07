@@ -54,6 +54,8 @@ class HardenedHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
     request_queue_size = 16
+    #: Where connection errors go (debug level); plugins may set their own.
+    log: logging.Logger = log
     #: Seconds for the whole TLS handshake; see :meth:`handshake_timeout`.
     handshake_timeout_s = 20.0
 
@@ -119,7 +121,7 @@ class HardenedHTTPServer(ThreadingHTTPServer):
 
     def handle_error(self, request: Any, client_address: Any) -> None:
         # Peers hang up mid-request; never print tracebacks with addresses.
-        log.debug("connection ended with an error", exc_info=True)
+        self.log.debug("connection ended with an error", exc_info=True)
 
 
 class DeadlineRequestHandler(BaseHTTPRequestHandler):
@@ -139,6 +141,8 @@ class DeadlineRequestHandler(BaseHTTPRequestHandler):
     linger_s = 0.0
     linger_bytes = 1024 * 1024
     log_prefix = ""
+    #: Where the one debug line per request goes; plugins may set their own.
+    log: logging.Logger = log
     deadline: DeadlineReader
 
     def request_deadline(self) -> float:
@@ -191,7 +195,7 @@ class DeadlineRequestHandler(BaseHTTPRequestHandler):
         """Never log paths, queries, headers or bodies."""
 
     def log_request(self, code: object = "-", size: object = "-") -> None:
-        log.debug("%s%s %s", self.log_prefix, self.command, code)
+        self.log.debug("%s%s %s", self.log_prefix, self.command, code)
 
     def read_body(self, limit: int, *, min_rate: float, grace: float | None = None) -> bytes:
         """Exactly ``Content-Length`` bytes, at most ``limit``.
@@ -237,7 +241,11 @@ class ServerGroup:
     :class:`ConnectionsPerAddress` is shared by all servers of the group.
     """
 
-    def __init__(self, max_per_address: int = 2, *, name: str = "blueferry-http") -> None:
+    def __init__(
+        self, max_per_address: int = 2, *, name: str = "blueferry-http",
+        logger: logging.Logger | None = None,
+    ) -> None:
+        self.log = logger or log
         self.servers: list[ThreadingHTTPServer] = []
         self._threads: list[threading.Thread] = []
         self._name = name
@@ -254,7 +262,7 @@ class ServerGroup:
             try:
                 server = factory((address, port), self.per_address)
             except OSError as error:
-                log.warning("cannot listen on %s:%d: %s", address, port, error.strerror)
+                self.log.warning("cannot listen on %s:%d: %s", address, port, error.strerror)
                 failed.append(address)
                 continue
             self.servers.append(server)

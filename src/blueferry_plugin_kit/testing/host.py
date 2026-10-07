@@ -63,14 +63,20 @@ def check_card(reply: str) -> list[dict]:
     items = data["items"]
     if len(items) > surfaces.MAX_CARD_ITEMS:
         raise SpecViolation(f"more than {surfaces.MAX_CARD_ITEMS} items")
+    seen: set[str] = set()
     for item in items:
         if not isinstance(item, dict) or set(item) != {
             "id", "icon", "title", "subtitle", "actions",
         }:
             raise SpecViolation(f"card item keys: {sorted(item)}")
         _id(item["id"], "item")
+        if item["id"] in seen:
+            raise SpecViolation(f"duplicate item id: {item['id']!r}")
+        seen.add(item["id"])
         _icon(item["icon"])
         _text(item["title"], surfaces.MAX_TITLE)
+        if not item["title"]:
+            raise SpecViolation("card item without a title")
         _text(item["subtitle"], surfaces.MAX_SUBTITLE, optional=True)
         actions = item["actions"]
         if not isinstance(actions, list) or len(actions) > surfaces.MAX_ACTIONS:
@@ -82,6 +88,8 @@ def check_card(reply: str) -> list[dict]:
             if action["kind"] not in surfaces.ACTION_KINDS:
                 raise SpecViolation(f"action kind {action['kind']!r}")
             _text(action["label"], surfaces.MAX_LABEL)
+            if not action["label"]:
+                raise SpecViolation("action without a label")
             _icon(action["icon"], optional=True)
     return items
 
@@ -134,6 +142,10 @@ def check_notification(args: tuple) -> tuple[str, str, str, str, str]:
     _text(body, surfaces.MAX_NOTIFY_BODY)
     _text(label, surfaces.MAX_LABEL)
     _icon(icon)
+    if not title:
+        raise SpecViolation("notification without a title")
+    if bool(label) != bool(action):
+        raise SpecViolation("notify action label and id come together")
     if action:
         _id(action, "notify action")
     return title, body, icon, label, action
@@ -238,6 +250,12 @@ class FakeHost:
 
     def send_files(self, target_id: str, paths: list[str]) -> dict:
         return check_send(self.call("SendFiles", target_id, paths))
+
+    def info(self) -> dict:
+        return _json(self.call("GetInfo"))
+
+    def status(self) -> dict:
+        return _json(self.call("Status"))
 
     def get_config(self) -> dict:
         return _json(self.call("GetConfig"))

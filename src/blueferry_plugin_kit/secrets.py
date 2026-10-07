@@ -52,9 +52,12 @@ def private_dir(path: Path, what: str = "config directory") -> Path:
     return path
 
 
-def write_private(path: Path, data: str | bytes) -> None:
-    """Replace ``path`` atomically with an owner-only file holding ``data``."""
-    private_dir(path.parent)
+def write_private(path: Path, data: str | bytes, *, what: str = "config directory") -> None:
+    """Replace ``path`` atomically with an owner-only file holding ``data``.
+
+    ``what`` names the parent directory in the error message.
+    """
+    private_dir(path.parent, what)
     descriptor, temporary = tempfile.mkstemp(prefix=".tmp-", dir=path.parent)
     try:
         os.fchmod(descriptor, 0o600)

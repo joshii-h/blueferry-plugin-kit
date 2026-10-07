@@ -90,6 +90,16 @@ def test_rate_limiter_counts_requests_and_locks_out_failures() -> None:
     assert limiter.admit("a")
 
 
+def test_rate_limiter_forgets_idle_clients() -> None:
+    clock = Clock()
+    limiter = RateLimiter(clock, max_tracked=4)
+    for number in range(5):
+        assert limiter.admit(f"10.0.0.{number}")
+    clock.now += 61
+    assert limiter.admit("10.0.0.99")      # over max_tracked: idle windows are dropped
+    assert set(limiter._requests) == {"10.0.0.99"}
+
+
 def test_sliding_windows_and_connections_per_address() -> None:
     clock = Clock()
     windows = SlidingWindows(60, 2, clock, max_tracked=2)
