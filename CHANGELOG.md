@@ -3,7 +3,7 @@
 All notable changes to blueferry-plugin-kit. Minor releases (0.x) may
 change the public API; patch releases only fix bugs (see README, Stability).
 
-## 0.4.0 – unreleased
+## 0.4.0 – 2026-10-16
 
 Targets plugin-api 1.5 (content-free popups).
 
@@ -17,7 +17,8 @@ Targets plugin-api 1.5 (content-free popups).
 - `testing.FakeHost` treats the removed 1.2 signal `Notify(s, s, s, s, s)`
   as a `SpecViolation`: plugins move to `NotifyService.emit_notify`.
 - `testing.host.check_pending(reply)` checks a `GetPendingNotification`
-  reply field by field.
+  reply field by field. Like BlueFerry, a popup needs a title or a body;
+  a body without a title is fine.
 
 ## 0.3.0 – 2026-10-07
 
