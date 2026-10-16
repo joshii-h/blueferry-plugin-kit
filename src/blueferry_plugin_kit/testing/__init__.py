@@ -1,8 +1,8 @@
 """Test doubles for plugin test suites.
 
 * :class:`FakeHost`: the BlueFerry core side of the plugin API (the 1.2
-  surfaces card, share, notify and the 1.3 settings helpers TestConfig and
-  ConfigLogin), checking every reply against the spec.
+  surfaces card, share, notify (popups fetched the 1.5 way) and the 1.3
+  settings helpers TestConfig and ConfigLogin), checking every reply against the spec.
 * :class:`FakeClipboard`, :class:`FakeSecret` (libsecret) and
   :func:`isolate_environment` for ``conftest.py``.
 * :class:`TestCA` (:mod:`.ca`, extra ``lanserver``): a throwaway CA with a

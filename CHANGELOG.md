@@ -3,6 +3,22 @@
 All notable changes to blueferry-plugin-kit. Minor releases (0.x) may
 change the public API; patch releases only fix bugs (see README, Stability).
 
+## 0.4.0 – unreleased
+
+Targets plugin-api 1.5 (content-free popups).
+
+- Pins `blueferry-plugin-api` at `plugin-api-v1.5.0`.
+- `testing.FakeHost` answers the content-free `NotifyChanged()` the way
+  the daemon does: it calls `GetPendingNotification()` until `more` is
+  false and records each popup in `notifications` (the same tuples as
+  before, so `click_notification` and `assert_never_sent` keep working).
+  A signal with arguments or more than 8 waiting popups is a
+  `SpecViolation`.
+- `testing.FakeHost` treats the removed 1.2 signal `Notify(s, s, s, s, s)`
+  as a `SpecViolation`: plugins move to `NotifyService.emit_notify`.
+- `testing.host.check_pending(reply)` checks a `GetPendingNotification`
+  reply field by field.
+
 ## 0.3.0 – 2026-10-07
 
 Targets plugin-api 1.4 (card actions that send files, `ReplacesTools`,

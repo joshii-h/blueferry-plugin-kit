@@ -1,4 +1,4 @@
-"""The fakes themselves: FakeHost checks replies against the 1.2 spec."""
+"""The fakes themselves: FakeHost checks replies against the plugin API spec."""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,7 @@ import json
 import pytest
 
 from blueferry_plugin_kit.testing import FakeClipboard, FakeHost, SpecViolation, TestCA
-from blueferry_plugin_kit.testing.host import check_card, check_result
+from blueferry_plugin_kit.testing.host import check_card, check_pending, check_result
 
 
 def _item(**changes) -> dict:
@@ -24,6 +24,17 @@ class Service:
         self.items = items
         self.result = result or {"ok": True, "message": None, "open_uri": None}
         self.calls = []
+        self.pending = []
+
+    def notify(self, title, body, icon, action_label, action_id) -> None:
+        """Queue a popup and signal it, the plugin-api 1.5 way."""
+        self.pending.append({"title": title, "body": body, "icon": icon,
+                             "action_label": action_label, "action_id": action_id})
+        self.NotifyChanged()
+
+    def GetPendingNotification(self, sender=None):
+        note = self.pending.pop(0) if self.pending else None
+        return json.dumps({"notification": note, "more": bool(self.pending)})
 
     def GetCardItems(self, sender=None):
         self.calls.append(("GetCardItems", sender))
@@ -45,7 +56,7 @@ def test_fake_host_calls_and_records_signals(tmp_path) -> None:
     assert host.item("a.b")["title"] == "T" and host.find("a.") is not None
     assert host.item("nope") is None
     service.CardChanged()
-    service.Notify("Titel", "Text", "folder", "Öffnen", "open-1")
+    service.notify("Titel", "Text", "folder", "Öffnen", "open-1")
     host.wait_for(lambda: len(host.notifications) == 1)
     assert host.card_changed == 1 and len(host.snapshots) == 1
     assert host.click_notification()["ok"] is True
@@ -53,11 +64,13 @@ def test_fake_host_calls_and_records_signals(tmp_path) -> None:
     assert host.invoke("a.b", "open", {"x": 1})["ok"] is True
     assert host.share_targets()[0]["id"] == "dav"
     with pytest.raises(SpecViolation):
-        service.Notify("x" * 81, "", "", "", "")
+        service.notify("x" * 81, "", "", "", "")
     with pytest.raises(SpecViolation):
         service.CardChanged("content")
     with pytest.raises(SpecViolation):
-        service.Notify("Titel", "", "", "Öffnen", "")     # label without action
+        service.NotifyChanged("content")
+    with pytest.raises(SpecViolation):
+        service.notify("Titel", "", "", "Öffnen", "")     # label without action
     with pytest.raises(SpecViolation):
         check_card(json.dumps({"items": [_item(), _item()]}))   # duplicate ids
 
@@ -137,3 +150,60 @@ def test_send_action_calls_send_files_on_the_target(tmp_path) -> None:
         host.send_action("gone", "send", ["/tmp/a"])
     with pytest.raises(SpecViolation, match="share capability"):
         FakeHost(SendingService(("card",))).send_action("dev-1", "send", ["/tmp/a"])
+
+
+def test_fake_host_fetches_every_waiting_popup() -> None:
+    service = Service([])
+    host = FakeHost(service)
+    service.pending = [
+        {"title": f"T{n}", "body": "", "icon": "", "action_label": "", "action_id": ""}
+        for n in range(3)
+    ]
+    service.NotifyChanged()
+    assert [note[0] for note in host.notifications] == ["T0", "T1", "T2"]
+    service.NotifyChanged()                             # nothing waits: no popup
+    assert len(host.notifications) == 3
+
+
+@pytest.mark.parametrize("reply", [
+    {"notification": None},
+    {"notification": None, "more": True},
+    {"notification": None, "more": "no"},
+    {"notification": {"title": "T", "body": ""}, "more": False},
+    {"notification": "T", "more": False},
+    {"notification": None, "more": False, "extra": 1},
+])
+def test_check_pending_rejects_malformed_replies(reply) -> None:
+    with pytest.raises(SpecViolation):
+        check_pending(json.dumps(reply))
+
+
+def test_fake_host_rejects_the_removed_notify_signal() -> None:
+    class Legacy(Service):
+        def Notify(self, *args) -> None:
+            pass
+
+    service = Legacy([])
+    FakeHost(service)
+    with pytest.raises(SpecViolation, match=r"removed in plugin-api 1\.5"):
+        service.Notify("Titel", "Text", "", "", "")
+
+
+def test_fake_host_with_the_plugin_api_notify_service() -> None:
+    from blueferry.plugin_api.service import NotifyService
+    from blueferry.plugin_api.testing import inline_service, manifest
+
+    class Popups(NotifyService):
+        def invoke_action(self, item_id, action_id, args):
+            from blueferry.plugin_api.surfaces import ActionResult
+            return ActionResult(ok=item_id == "notify" and action_id == "open-1")
+
+    service = inline_service(Popups, manifest("io.example.popups", capabilities="notify;"))
+    host = FakeHost(service)
+    service.emit_notify("Titel", "Text", "folder", "Öffnen", "open-1")
+    service.emit_notify("Zweiter", "Text")
+    assert host.notifications == [
+        ("Titel", "Text", "folder", "Öffnen", "open-1"),
+        ("Zweiter", "Text", "", "", ""),
+    ]
+    assert host.click_notification(0)["ok"] is True

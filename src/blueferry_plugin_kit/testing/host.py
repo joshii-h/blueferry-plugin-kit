@@ -7,7 +7,10 @@ methods declared with D-Bus async callbacks, ``reply``/``error``. Every
 reply is checked field by field against the limits of
 :mod:`blueferry.plugin_api.surfaces`; a violation raises
 :class:`SpecViolation` (an ``AssertionError``). The content-free
-``CardChanged()`` and the ``Notify(...)`` signals are recorded.
+``CardChanged()`` is counted. Popups follow plugin-api 1.5: on the
+content-free ``NotifyChanged()`` the host fetches every waiting popup with
+``GetPendingNotification()`` and records it; the removed 1.2 signal
+``Notify(...)`` with the text on the bus is a violation.
 """
 from __future__ import annotations
 
@@ -157,6 +160,28 @@ def check_notification(args: tuple) -> tuple[str, str, str, str, str]:
     return title, body, icon, label, action
 
 
+def check_pending(reply: str) -> tuple[tuple[str, str, str, str, str] | None, bool]:
+    """A ``GetPendingNotification`` reply (plugin-api 1.5).
+
+    ``{"notification": {title, body, icon, action_label, action_id} | null,
+    "more": bool}``; returns ``(notification or None, more)``.
+    """
+    data = _json(reply)
+    if not isinstance(data, dict) or set(data) != {"notification", "more"} or not isinstance(
+        data["more"], bool,
+    ):
+        raise SpecViolation("GetPendingNotification reply must be {notification, more}")
+    note = data["notification"]
+    if note is None:
+        if data["more"]:
+            raise SpecViolation("no pending notification, but more waiting")
+        return None, False
+    keys = ("title", "body", "icon", "action_label", "action_id")
+    if not isinstance(note, dict) or set(note) != set(keys):
+        raise SpecViolation(f"pending notification keys must be {keys}")
+    return check_notification(tuple(note[key] for key in keys)), data["more"]
+
+
 def _one_line(value: object, limit: int = config_flow.MAX_MESSAGE) -> None:
     if not isinstance(value, str) or len(value) > limit:
         raise SpecViolation(f"message over {limit} characters: {value!r}")
@@ -225,7 +250,9 @@ class FakeHost:
         self._changed = threading.Condition()
         # Instance attributes shadow the dbus-decorated signal methods.
         service.CardChanged = self._on_card_changed
-        service.Notify = self._on_notify
+        service.NotifyChanged = self._on_notify_changed
+        if hasattr(service, "Notify"):
+            service.Notify = self._on_legacy_notify
 
     # ---- signals --------------------------------------------------------------
 
@@ -238,11 +265,27 @@ class FakeHost:
         if self.refetch:
             self.snapshots.append(self.card_items())
 
-    def _on_notify(self, *args: Any) -> None:
-        notification = check_notification(args)
-        with self._changed:
-            self.notifications.append(notification)
-            self._changed.notify_all()
+    def _on_notify_changed(self, *args: Any) -> None:
+        """Fetch what waits, like the daemon: until ``more`` is false."""
+        if args:
+            raise SpecViolation("NotifyChanged carries no content")
+        for _fetch in range(surfaces.MAX_PENDING_NOTIFICATIONS):
+            notification, more = check_pending(self.call("GetPendingNotification"))
+            if notification is not None:
+                with self._changed:
+                    self.notifications.append(notification)
+                    self._changed.notify_all()
+            if not more:
+                return
+        raise SpecViolation(
+            f"more than {surfaces.MAX_PENDING_NOTIFICATIONS} popups waiting at once",
+        )
+
+    def _on_legacy_notify(self, *args: Any) -> None:
+        raise SpecViolation(
+            "Notify(s, s, s, s, s) was removed in plugin-api 1.5: emit the content-free "
+            "NotifyChanged() (NotifyService.emit_notify) and answer GetPendingNotification()",
+        )
 
     def wait_for(self, predicate: Callable[[], bool], timeout: float = 10.0) -> None:
         """Block until ``predicate()`` holds (checked on every signal)."""

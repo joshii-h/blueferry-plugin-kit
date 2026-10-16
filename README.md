@@ -10,10 +10,12 @@ Most of it was extracted from the plugins that use it (shortcuts,
 localsend, webdav, calendar, immich), where it has been reviewed and
 tested. 0.2 adds the plugin-api 1.3 pieces (`auth.nextcloud`,
 `configtest`, the settings checks in `FakeHost`); 0.3 follows plugin-api
-1.4 (card actions that send files, `FakeHost.send_action`).
+1.4 (card actions that send files, `FakeHost.send_action`); 0.4 follows
+plugin-api 1.5 (content-free popups: `FakeHost` answers `NotifyChanged()`
+with `GetPendingNotification()`).
 
-It targets the plugin contract **plugin-api 1.4**
-(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.4.0#subdirectory=plugin-api`)
+It targets the plugin contract **plugin-api 1.5**
+(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.5.0#subdirectory=plugin-api`)
 and Python 3.10+.
 
 ## Install
@@ -35,13 +37,13 @@ In a plugin's `pyproject.toml`:
 
 ```toml
 dependencies = [
-  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.4.0#subdirectory=plugin-api",
-  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.3.0",
+  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.5.0#subdirectory=plugin-api",
+  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.4.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.3.0",
+  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.4.0",
   "pytest>=7,<10",
 ]
 ```
@@ -272,7 +274,8 @@ host = FakeHost(service, cache_roots=[cache_dir])  # plays the core for card/sha
 items = host.card_items()                          # SpecViolation on any 1.2 breach
 result = host.invoke("item-id", "action-id", {"x": 1})
 host.send_action("dev-1", "send", [str(photo)])     # 1.4: an action with send_to
-host.wait_for(lambda: host.notifications)
+service.emit_notify("Title", "Body")                # 1.5: NotifyService queues it,
+host.wait_for(lambda: host.notifications)           # the host fetches it on NotifyChanged()
 
 # 1.3 settings helpers, checked against the spec as well
 host.test_config({"url": "https://photos.example.com", "api_key": "…"})  # {ok, message}
@@ -296,7 +299,7 @@ CA when the test sets `SSL_CERT_FILE` to `ca.store.ca_cert_path`.
 The public API is every name without a leading underscore in the modules
 above. From 0.1 on, a **minor** release (0.1 → 0.2) may change it; a
 **patch** release (0.1.0 → 0.1.1) never does, it only fixes bugs. Plugins
-pin a tag (`@kit-v0.3.0`). From 1.0 on the usual semantic-versioning rules
+pin a tag (`@kit-v0.4.0`). From 1.0 on the usual semantic-versioning rules
 apply. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Logging
