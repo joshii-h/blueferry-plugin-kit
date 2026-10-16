@@ -178,6 +178,27 @@ def test_check_pending_rejects_malformed_replies(reply) -> None:
         check_pending(json.dumps(reply))
 
 
+def _pending(title: object, body: object) -> str:
+    return json.dumps({"notification": {
+        "title": title, "body": body, "icon": "", "action_label": "", "action_id": "",
+    }, "more": False})
+
+
+def test_check_pending_accepts_a_popup_with_only_a_body_like_blueferry() -> None:
+    from blueferry.plugin_api import surfaces
+
+    assert surfaces.parse_notification("", "Akku 15 %") is not None
+    assert check_pending(_pending("", "Akku 15 %")) == (("", "Akku 15 %", "", "", ""), False)
+    assert check_pending(_pending("Titel", "")) == (("Titel", "", "", "", ""), False)
+
+
+def test_check_pending_rejects_an_empty_popup_and_wrong_field_types() -> None:
+    with pytest.raises(SpecViolation, match="title and a body"):
+        check_pending(_pending("", ""))
+    with pytest.raises(SpecViolation, match="five string fields"):
+        check_pending(_pending(1, "Text"))
+
+
 def test_fake_host_rejects_the_removed_notify_signal() -> None:
     class Legacy(Service):
         def Notify(self, *args) -> None:
@@ -202,8 +223,10 @@ def test_fake_host_with_the_plugin_api_notify_service() -> None:
     host = FakeHost(service)
     service.emit_notify("Titel", "Text", "folder", "Öffnen", "open-1")
     service.emit_notify("Zweiter", "Text")
+    service.emit_notify("", "Nur Text")
     assert host.notifications == [
         ("Titel", "Text", "folder", "Öffnen", "open-1"),
         ("Zweiter", "Text", "", "", ""),
+        ("", "Nur Text", "", "", ""),
     ]
     assert host.click_notification(0)["ok"] is True

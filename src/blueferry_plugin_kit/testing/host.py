@@ -144,15 +144,23 @@ def check_send(reply: str) -> dict:
 
 
 def check_notification(args: tuple) -> tuple[str, str, str, str, str]:
+    """A pending popup's fields, as ``GetPendingNotification`` returns them.
+
+    Like BlueFerry (``surfaces.parse_notification``) a popup needs a title
+    or a body; one of the two may be empty.
+    """
     if len(args) != 5 or not all(isinstance(a, str) for a in args):
-        raise SpecViolation("Notify takes five strings")
+        raise SpecViolation(
+            "a pending notification has five string fields: "
+            "title, body, icon, action_label, action_id",
+        )
     title, body, icon, label, action = args
     _text(title, surfaces.MAX_TITLE)
     _text(body, surfaces.MAX_NOTIFY_BODY)
     _text(label, surfaces.MAX_LABEL)
     _icon(icon)
-    if not title:
-        raise SpecViolation("notification without a title")
+    if not title and not body:
+        raise SpecViolation("notification without a title and a body")
     if bool(label) != bool(action):
         raise SpecViolation("notify action label and id come together")
     if action:
