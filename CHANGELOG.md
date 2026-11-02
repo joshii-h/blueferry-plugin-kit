@@ -3,6 +3,12 @@
 All notable changes to blueferry-plugin-kit. Minor releases (0.x) may
 change the public API; patch releases only fix bugs (see README, Stability).
 
+## 0.4.1 – 2026-11-02
+
+- Pins `blueferry-plugin-api` at `plugin-api-v1.6.0` from the official
+  repository (`erikwb/blueferry`) instead of the fork. Plugin API 1.6 only
+  adds settings buttons and named help links; nothing in the kit changes.
+
 ## 0.4.0 – 2026-10-16
 
 Targets plugin-api 1.5 (content-free popups).

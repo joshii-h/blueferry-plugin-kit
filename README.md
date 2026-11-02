@@ -14,8 +14,8 @@ tested. 0.2 adds the plugin-api 1.3 pieces (`auth.nextcloud`,
 plugin-api 1.5 (content-free popups: `FakeHost` answers `NotifyChanged()`
 with `GetPendingNotification()`).
 
-It targets the plugin contract **plugin-api 1.5**
-(`blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.5.0#subdirectory=plugin-api`)
+It targets the plugin contract **plugin-api 1.6**
+(`blueferry-plugin-api @ git+https://github.com/erikwb/blueferry@plugin-api-v1.6.0#subdirectory=plugin-api`)
 and Python 3.10+.
 
 ## Install
@@ -37,13 +37,13 @@ In a plugin's `pyproject.toml`:
 
 ```toml
 dependencies = [
-  "blueferry-plugin-api @ git+https://github.com/joshii-h/blueferry@plugin-api-v1.5.0#subdirectory=plugin-api",
-  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.4.0",
+  "blueferry-plugin-api @ git+https://github.com/erikwb/blueferry@plugin-api-v1.6.0#subdirectory=plugin-api",
+  "blueferry-plugin-kit[dav] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.4.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.4.0",
+  "blueferry-plugin-kit[dav,testing] @ git+https://github.com/joshii-h/blueferry-plugin-kit@kit-v0.4.1",
   "pytest>=7,<10",
 ]
 ```
@@ -299,7 +299,7 @@ CA when the test sets `SSL_CERT_FILE` to `ca.store.ca_cert_path`.
 The public API is every name without a leading underscore in the modules
 above. From 0.1 on, a **minor** release (0.1 → 0.2) may change it; a
 **patch** release (0.1.0 → 0.1.1) never does, it only fixes bugs. Plugins
-pin a tag (`@kit-v0.4.0`). From 1.0 on the usual semantic-versioning rules
+pin a tag (`@kit-v0.4.1`). From 1.0 on the usual semantic-versioning rules
 apply. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Logging
